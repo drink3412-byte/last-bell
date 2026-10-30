@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="#101a29"><title>잔월의 서약 · The Last Bell</title>
-<link rel="stylesheet" href="style.css?v=14">
+<link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
 <div id="gameShell">
@@ -15,6 +15,9 @@
  <button id="routeAction" aria-label="길 안내 및 전투 진행">✦ 길 안내 / 이동 계속</button>
  <div id="topRight"><div id="money">✦ 0</div><button id="mapBtn" class="smallButton" aria-label="지도">⌖</button><button id="bagBtn" class="smallButton" aria-label="여정 일지">☷</button><button id="pauseBtn" class="smallButton" aria-label="일시정지">Ⅱ</button></div>
  <div id="bottomLeft"><div id="tip">✦ 달빛이 길을 기억하고 있습니다.</div><div id="hint">자동 길찾기 · 직접 검격 · 성장하는 마법</div></div>
+ <div id="movePad" aria-label="전투 중 이동 스틱"><div id="stickTracks"></div><div id="stickNub"></div><span>이동</span></div>
+ <div id="resonanceHud">✧ 월광 공명 <b id="resonanceCount">✧ 0 / 3</b></div>
+ <button id="dodgeButton" aria-label="달걸음 회피">↝<small>달걸음</small></button>
  <button id="attackButton" aria-label="검격" title="검격">⚔<span>검격</span></button>
  <button id="spellSwitch" aria-label="사용할 마법 변경">✦ 마법 선택</button>
  <button id="skillButton" class="skillReady" aria-label="달빛 파동 사용"><span class="skillGlyph">✧</span><span class="skillText" id="spellName">달빛 파동</span><span id="skillCooldown" class="skillCooldown hidden"></span></button>
@@ -24,6 +27,7 @@
  <div class="dialogBox hidden" id="dialog"><div id="dialogName" class="dialogName"></div><div id="dialogText" class="dialogText"></div><button id="dialogNext" class="dialogContinue">계속 ▸</button></div>
  <div class="modal hidden" id="panelModal"><div class="panel"><div class="panelSmall" id="panelKicker">TRAVELER'S JOURNAL</div><h2 id="panelTitle">여정 일지</h2><div id="panelContent" class="panelText"></div><button id="panelClose" class="panelClose">닫기</button></div></div>
 </div>
+<script src="visuals.js?v=15"></script>
 <script src="chronicles.js"></script>
-<script src="game.js?v=14"></script>
+<script src="game.js?v=15"></script>
 </body></html>
