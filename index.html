@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#101a29"><title>잔월의 서약 · The Last Bell</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="gameShell">
+ <canvas id="game" width="480" height="270" aria-label="잔월의 서약 게임 화면"></canvas>
+ <div id="weather"></div><div id="shade"></div>
+ <div class="hud" id="upperLeft"><div class="subhead">CHAPTER I · THE LAST BELL</div><div id="placeName">잿빛 마을, 엘든</div><div class="barRow"><span class="barName">HP</span><div class="bar"><div class="barFill" id="hpFill"></div></div><span class="barValue" id="hpValue">120 / 120</span></div><div class="barRow"><span class="barName">MP</span><div class="bar"><div class="barFill mana" id="mpFill"></div></div><span class="barValue" id="mpValue">100 / 100</span></div></div>
+ <div id="questBox"><div class="miniLabel">✧ MAIN QUEST</div><div id="questTitle">그믐의 속삭임</div><div id="questDetail">종지기 에다를 만나세요.</div></div>
+ <div id="topRight"><div id="money">✦ 0</div><button id="mapBtn" class="smallButton" aria-label="지도">⌖</button><button id="bagBtn" class="smallButton" aria-label="여정 일지">☷</button><button id="pauseBtn" class="smallButton" aria-label="일시정지">Ⅱ</button></div>
+ <div id="bottomLeft"><div id="tip">✦ 달빛이 길을 기억하고 있습니다.</div><div id="hint">터치 이동 · 가까이 가면 자동 공격 · 스킬 버튼 하나</div></div>
+ <button id="skillButton" class="skillReady" aria-label="달빛 파동 사용"><span class="skillGlyph">✧</span><span class="skillText">달빛 파동</span><span id="skillCooldown" class="skillCooldown hidden"></span></button>
+ <div id="screenToast"><div id="toastTop"></div><div id="toastMsg"></div></div>
+ <div class="modal" id="menu"><div class="menuInterior"><div class="eyebrow">A PIXEL FANTASY ADVENTURE</div><div class="ornament">✦ ── ☾ ── ✦</div><h1 class="bigTitle">잔월의 서약</h1><div class="subtitle">THE LAST BELL</div><p class="menuCopy">달이 부서진 밤, 마지막 종은 울리지 않았다.<br>잊힌 숲과 폐허가 된 성당 너머로, 빛을 되찾기 위한 여정이 시작된다.</p><div><button id="startBtn" class="primary">새로운 여정</button><button id="continueBtn" class="primary secondary hidden">이어하기</button></div><div class="menuFooter">EXPLORE · REMEMBER · RETURN</div></div></div>
+ <div class="dialogBox hidden" id="dialog"><div id="dialogName" class="dialogName"></div><div id="dialogText" class="dialogText"></div><button id="dialogNext" class="dialogContinue">계속 ▸</button></div>
+ <div class="modal hidden" id="panelModal"><div class="panel"><div class="panelSmall" id="panelKicker">TRAVELER'S JOURNAL</div><h2 id="panelTitle">여정 일지</h2><div id="panelContent" class="panelText"></div><button id="panelClose" class="panelClose">닫기</button></div></div>
+</div>
+<script src="game.js"></script>
+</body></html>
