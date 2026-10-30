@@ -21,6 +21,26 @@ let autoGoal=null, followTarget=null, destination=null, waypointPath=[], pointer
 let toastT=0,phaseBanner='',phaseT=0,questStage=0,fragmentFlags=[false,false,false], loreGift=false, bossGone=false, audioOn=true;
 let railIndex=0,railPhase='idle',railGoal=null,railClearTimer=0,railTravelTimer=0,railLastDistance=Infinity,railStuck=0,pendingLevels=0;
 let prologueTime=0,prologueActive=false;
+// The Silver Interval: choose your footing, read the enemy's warning, evade and counter.
+let combatCenter={x:0,y:0}, dodgeCooldown=0,dodgeTime=0,dodgeDirection={x:1,y:0};
+let resonance=0,combatTipShown=false;
+const thumb={active:false,pointer:null,x:0,y:0};
+const DODGE_COOLDOWN=2.8;
+function setCombatUI(){document.body.classList.toggle('combat-active',scene==='play'&&railPhase==='battle');}
+function getMoveVector(){return {x:thumb.x,y:thumb.y};}
+function clearThumb(){thumb.active=false;thumb.pointer=null;thumb.x=thumb.y=0;const nub=$('stickNub');if(nub)nub.style.transform='translate(-50%,-50%)';}
+function giveResonance(label){if(railPhase!=='battle')return;resonance=Math.min(3,resonance+1);makeParticles(hero.x,hero.y-20,14,['#b9edff','#e8e6af','#b7bfff'],1.1);floating(hero.x,hero.y-41,label||'✧ 달빛 공명 +1','#d3efff',1);}
+function dodge(){if(scene!=='play'||railPhase!=='battle'||dodgeCooldown>0||dodgeTime>0)return false;
+ let dx=thumb.x,dy=thumb.y;
+ if(Math.hypot(dx,dy)<.15){dx=(keys.right?1:0)-(keys.left?1:0);dy=(keys.down?1:0)-(keys.up?1:0)}
+ if(Math.hypot(dx,dy)<.15){const near=entities.filter(e=>!e.dead).sort((a,b)=>dist(a,hero)-dist(b,hero))[0];if(near){dx=hero.x-near.x;dy=hero.y-near.y}else dx=hero.face;}
+ const d=Math.hypot(dx,dy)||1;dodgeDirection={x:dx/d,y:dy/d};dodgeTime=.32;dodgeCooldown=DODGE_COOLDOWN;hero.inv=Math.max(hero.inv,.40);
+ const danger=entities.some(e=>!e.dead&&e.windup>0&&dist(e,hero)<e.range+70)||shots.some(b=>dist(b,hero)<65);
+ if(danger){giveResonance('✧ 완벽한 달걸음');hero.mp=clamp(hero.mp+12,0,hero.maxMp)}
+ pulse(hero.x,hero.y-8,42,'#a9e5f6');makeParticles(hero.x,hero.y-8,18,['#d9f0fc','#e2d8ae','#b4c6eb'],1.3);
+ sfx('dodge');return true;
+}
+
 const OPENING_LINES=['한때 이 땅에는 모든 저녁을 밝히는 종이 있었습니다.', '달이 부서진 날, 종소리가 멎고 숲에는 밤이 머물렀습니다.', '먼 곳에서는 아직 이름을 잃은 종이 당신을 기다립니다.'];
 function openingUpdate(dt){if(!prologueActive)return;prologueTime+=dt;const index=Math.min(OPENING_LINES.length-1,Math.floor(prologueTime/3.6));const node=$('openingNarration');if(node){node.textContent='서막 · '+OPENING_LINES[index];node.classList.remove('hidden')}if(prologueTime>11){prologueActive=false;node?.classList.add('hidden')}}
 const RAIL_LABELS=['종지기의 부름','안개숲의 첫 시련','속삭임의 제단','숲을 지키는 그림자','오래된 병사의 비석','폐허의 망령들','푸른 달의 유적','마을로 돌아온 빛','성당 앞의 맹세','달의 기사','새벽을 부르는 종'];
@@ -183,12 +203,12 @@ function floating(x,y,label,col='#f1e5b5',life=1.2){floatText.push({x,y,txt:labe
 function pulse(x,y,r,col='#a0cffb'){shines.push({x,y,r,life:.4,max:.4,color:col})}
 function toast(top,msg,sec=3){$('toastTop').textContent=top;$('toastMsg').textContent=msg;toastT=sec;$('screenToast').style.opacity='1'}
 function bumpQuest(){if(railIndex>=INTRO_STOPS&&CHRONICLE[railIndex-INTRO_STOPS]){const beat=CHRONICLE[railIndex-INTRO_STOPS];UI.questTitle.textContent=beat.title;UI.questDetail.textContent=beat.chapter;updateUI();save();return}let [q,detail]=questData[questStage];if(questStage===1)detail=`월광의 조각 ${fragmentFlags.filter(Boolean).length} / 3 · 이야기를 따라 자동으로 이동합니다.`;UI.questTitle.textContent=q;UI.questDetail.textContent=detail;updateUI();save()}
-function updateUI(){UI.hpFill.style.width=(100*hero.hp/hero.maxHp)+'%';UI.hpValue.textContent=Math.ceil(hero.hp)+' / '+hero.maxHp;UI.mpFill.style.width=(100*hero.mp/hero.maxMp)+'%';UI.mpValue.textContent=Math.floor(hero.mp)+' / '+hero.maxMp;UI.money.textContent='✦ '+hero.gold;const remain=hero.skillT;UI.cooldown.classList.toggle('hidden',remain<=0);if(remain>0)UI.cooldown.textContent=Math.ceil(remain)+'s';UI.skill.classList.toggle('skillReady',remain<=0);$('levelBadge').textContent=`LV ${hero.level}  ·  ⚔ ${hero.damage}  ·  ♥ ${hero.maxHp}`;$('xpFill').style.width=(hero.xp/(35+hero.level*25)*100)+'%';$('xpText').textContent=`EXP ${Math.floor(hero.xp)} / ${35+hero.level*25}`;$('routeIndex').textContent=`${String(Math.min(railIndex+1,RAIL_STOPS.length)).padStart(2,'0')} / ${RAIL_STOPS.length}`;$('routeTitle').textContent=RAIL_LABELS[railIndex]||'새벽의 서약';document.querySelector('.subhead').textContent=railIndex<INTRO_STOPS?'CHAPTER I · THE LAST BELL':(CHRONICLE[railIndex-INTRO_STOPS]?.chapter||'CHRONICLE');$('routeMode').textContent=railPhase==='travel'?'✧ 다음 장면으로 자동 이동 중':railPhase==='battle'?'⚔ 전투 중 · 검격과 마법을 직접 사용하세요':railPhase==='scene'?'✦ 이야기 진행 중':railPhase==='done'?'✧ 제1장 완료':'✧ 여정 준비 중';$('spellName').textContent=currentSpell().name;$('spellSwitch').textContent='✦ '+unlockedSpells().length+'개 마법';$('skillCooldown').title=currentSpell().desc;$('routeAction').textContent=railPhase==='travel'?'✦ 길 안내 / 이동 계속':railPhase==='battle'?'⚔ 검격 / 연속 공격':railPhase==='done'?'✦ 이야기 기록 보기':'✧ 다음 장면 보기';}
+function updateUI(){UI.hpFill.style.width=(100*hero.hp/hero.maxHp)+'%';UI.hpValue.textContent=Math.ceil(hero.hp)+' / '+hero.maxHp;UI.mpFill.style.width=(100*hero.mp/hero.maxMp)+'%';UI.mpValue.textContent=Math.floor(hero.mp)+' / '+hero.maxMp;UI.money.textContent='✦ '+hero.gold;const remain=hero.skillT;UI.cooldown.classList.toggle('hidden',remain<=0);if(remain>0)UI.cooldown.textContent=Math.ceil(remain)+'s';UI.skill.classList.toggle('skillReady',remain<=0);$('levelBadge').textContent=`LV ${hero.level}  ·  ⚔ ${hero.damage}  ·  ♥ ${hero.maxHp}`;$('xpFill').style.width=(hero.xp/(35+hero.level*25)*100)+'%';$('xpText').textContent=`EXP ${Math.floor(hero.xp)} / ${35+hero.level*25}`;$('routeIndex').textContent=`${String(Math.min(railIndex+1,RAIL_STOPS.length)).padStart(2,'0')} / ${RAIL_STOPS.length}`;$('routeTitle').textContent=RAIL_LABELS[railIndex]||'새벽의 서약';document.querySelector('.subhead').textContent=railIndex<INTRO_STOPS?'CHAPTER I · THE LAST BELL':(CHRONICLE[railIndex-INTRO_STOPS]?.chapter||'CHRONICLE');setCombatUI();$('resonanceCount').textContent='✧ '+resonance+' / 3';$('dodgeButton').querySelector('small').textContent=dodgeCooldown>0?dodgeCooldown.toFixed(1)+'s':'달걸음';$('routeMode').textContent=railPhase==='travel'?'✧ 다음 장면으로 자동 이동 중':railPhase==='battle'?'⚔ 왼쪽 이동 · 적의 붉은 예고를 피하고 반격하세요':railPhase==='scene'?'✦ 이야기 진행 중':railPhase==='done'?'✧ 제1장 완료':'✧ 여정 준비 중';$('spellName').textContent=currentSpell().name;$('spellSwitch').textContent='✦ '+unlockedSpells().length+'개 마법';$('skillCooldown').title=currentSpell().desc;$('routeAction').textContent=railPhase==='travel'?'✦ 길 안내 / 이동 계속':railPhase==='battle'?'⚔ 검격 / 연속 공격':railPhase==='done'?'✦ 이야기 기록 보기':'✧ 다음 장면 보기';}
 function save(){try{localStorage.setItem(SKEY,JSON.stringify({hero:{x:hero.x,y:hero.y,hp:hero.hp,maxHp:hero.maxHp,mp:hero.mp,maxMp:hero.maxMp,gold:hero.gold,level:hero.level,xp:hero.xp,damage:hero.damage,swordLevel:hero.swordLevel,armorLevel:hero.armorLevel,blessings:hero.blessings,oaths:hero.oaths,selectedSpell:hero.selectedSpell},questStage,fragmentFlags,loreGift,bossGone,railIndex,pendingLevels,railV:1}))}catch(e){}}
 function hasSave(){try{return!!localStorage.getItem(SKEY)}catch(e){return false}}
-function load(){try{const state=JSON.parse(localStorage.getItem(SKEY));if(!state)return false;Object.assign(hero,state.hero||{});hero.blessings={blade:0,heart:0,moon:0,...(hero.blessings||{})};questStage=state.questStage||0;fragmentFlags=state.fragmentFlags||[false,false,false];loreGift=!!state.loreGift;bossGone=!!state.bossGone;railIndex=state.railV?clamp(state.railIndex||0,RAIL_STOPS.length-1):0;pendingLevels=state.pendingLevels||0;hero.oaths=Array.isArray(hero.oaths)?hero.oaths:[];hero.selectedSpell=Number(hero.selectedSpell)||0;hero.vx=hero.vy=hero.moving=0;hero.step=0;if(!state.railV){questStage=0;fragmentFlags=[false,false,false];bossGone=false;hero.x=250;hero.y=465;hero.hp=hero.maxHp;}return true}catch(e){return false}}
-function reset(){prologueActive=false;prologueTime=0;$('openingNarration')?.classList.add('hidden');Object.assign(hero,{x:250,y:460,hp:120,maxHp:120,mp:100,maxMp:100,gold:12,level:1,xp:0,damage:15,swordLevel:0,armorLevel:0,blessings:{blade:0,heart:0,moon:0},atkT:0,skillT:0,inv:0,vx:0,vy:0,moving:0,step:0,selectedSpell:0,oaths:[]});questStage=0;fragmentFlags=[false,false,false];loreGift=false;bossGone=false;railIndex=0;railPhase='idle';pendingLevels=0;autoGoal=null;followTarget=null;waypointPath=[];initMonsters();}
-function dialog(name,lines,done){if(typeof lines==='string')lines=[lines];scene='dialog';paused=true;autoGoal=null;waypointPath=[];const box=UI.dialog;box.classList.remove('hidden');let idx=0;function show(){box.querySelector('#dialogName').textContent=name;box.querySelector('#dialogText').textContent=lines[idx];$('dialogNext').textContent=idx<lines.length-1?'다음 이야기  ›':'계속 여행하기  ✦'}show();const advance=()=>{chime(440+idx*90);if(++idx<lines.length){show()}else{box.classList.add('hidden');scene='play';paused=false;if(done)done();}};$('dialogNext').onclick=advance;box.onclick=e=>{if(e.target.closest('button'))return;advance()};}
+function load(){try{clearThumb();dodgeCooldown=0;dodgeTime=0;resonance=0;const state=JSON.parse(localStorage.getItem(SKEY));if(!state)return false;Object.assign(hero,state.hero||{});hero.blessings={blade:0,heart:0,moon:0,...(hero.blessings||{})};questStage=state.questStage||0;fragmentFlags=state.fragmentFlags||[false,false,false];loreGift=!!state.loreGift;bossGone=!!state.bossGone;railIndex=state.railV?clamp(state.railIndex||0,RAIL_STOPS.length-1):0;pendingLevels=state.pendingLevels||0;hero.oaths=Array.isArray(hero.oaths)?hero.oaths:[];hero.selectedSpell=Number(hero.selectedSpell)||0;hero.vx=hero.vy=hero.moving=0;hero.step=0;if(!state.railV){questStage=0;fragmentFlags=[false,false,false];bossGone=false;hero.x=250;hero.y=465;hero.hp=hero.maxHp;}return true}catch(e){return false}}
+function reset(){clearThumb();dodgeCooldown=0;dodgeTime=0;resonance=0;prologueActive=false;prologueTime=0;$('openingNarration')?.classList.add('hidden');Object.assign(hero,{x:250,y:460,hp:120,maxHp:120,mp:100,maxMp:100,gold:12,level:1,xp:0,damage:15,swordLevel:0,armorLevel:0,blessings:{blade:0,heart:0,moon:0},atkT:0,skillT:0,inv:0,vx:0,vy:0,moving:0,step:0,selectedSpell:0,oaths:[]});questStage=0;fragmentFlags=[false,false,false];loreGift=false;bossGone=false;railIndex=0;railPhase='idle';pendingLevels=0;autoGoal=null;followTarget=null;waypointPath=[];initMonsters();}
+function dialog(name,lines,done){if(typeof lines==='string')lines=[lines];scene='dialog';paused=true;autoGoal=null;waypointPath=[];const box=UI.dialog;box.classList.remove('hidden');let idx=0;function show(){box.querySelector('#dialogName').textContent=name;box.querySelector('#dialogText').textContent=lines[idx];$('dialogNext').textContent=idx<lines.length-1?'다음 이야기  ›':'계속 여행하기  ✦'}show();const advance=()=>{pageTurnSfx();if(++idx<lines.length){show()}else{box.classList.add('hidden');scene='play';paused=false;if(done)done();}};$('dialogNext').onclick=advance;box.onclick=e=>{if(e.target.closest('button'))return;advance()};}
 // Guided story mode: authored routes, authored encounters, no aimless roaming.
 function setRail(index){
  railIndex=clamp(index,0,RAIL_STOPS.length-1);railPhase='travel';railClearTimer=0;railTravelTimer=0;railStuck=0;railLastDistance=Infinity;shots=[];
@@ -203,7 +223,7 @@ function setRail(index){
 }
 function nextRail(){if(railIndex>=RAIL_STOPS.length-1){railPhase='done';showEnding();save();return}setRail(railIndex+1);}
 function beginEncounter(roster,heading){
- railPhase='battle';entities=[];shots=[];autoGoal=null;waypointPath=[];hero.vx=hero.vy=0;hero.hp=clamp(hero.hp+Math.round(hero.maxHp*.30),0,hero.maxHp);hero.mp=hero.maxMp;hero.inv=1.3;
+ railPhase='battle';entities=[];shots=[];autoGoal=null;waypointPath=[];hero.vx=hero.vy=0;hero.hp=clamp(hero.hp+Math.round(hero.maxHp*.30),0,hero.maxHp);hero.mp=hero.maxMp;hero.inv=1.3;combatCenter={x:hero.x,y:hero.y};dodgeCooldown=0;dodgeTime=0;resonance=0;clearThumb();combatTipShown=false;
  roster.forEach((entry,i)=>{const [type,dx,dy]=entry;const x=clamp(hero.x+dx,20,WW-20),y=clamp(hero.y+dy,30,WH-30);const e=spawnMonster(type,x,y,'scene'+railIndex+'-'+i);e.aggro=8;e.attack=.9+i*.35});
  railClearTimer=0;toast('⚔ ENCOUNTER',heading,4);chime(320);save();
 }
@@ -278,7 +298,7 @@ function railTick(dt){
   if(d<22||(!autoGoal&&railTravelTimer>.3))railArrival();
  }else if(railPhase==='battle'){
   if(entities.length>0&&entities.every(e=>e.dead)){
-   railClearTimer+=dt;if(railClearTimer>.85){railPhase='scene';hero.hp=clamp(hero.hp+Math.round(hero.maxHp*.5),0,hero.maxHp);hero.mp=hero.maxMp;entities=[];shots=[];dialog('전투의 끝 · 남은 여운',['흩어진 그림자가 안개 속으로 스며듭니다. 잠시 숨을 고르면, 달빛이 다시 다음 길을 보여줍니다.'],()=>{if(!maybeLevelUp())nextRail();else railPhase='scene'})}
+   railClearTimer+=dt;if(railClearTimer>.85){railPhase='scene';clearThumb();resonance=0;hero.hp=clamp(hero.hp+Math.round(hero.maxHp*.5),0,hero.maxHp);hero.mp=hero.maxMp;entities=[];shots=[];dialog('전투의 끝 · 남은 여운',['흩어진 그림자가 안개 속으로 스며듭니다. 잠시 숨을 고르면, 달빛이 다시 다음 길을 보여줍니다.'],()=>{if(!maybeLevelUp())nextRail();else railPhase='scene'})}
   }
  }
 }
@@ -321,22 +341,22 @@ function attackSword(){
  const target=entities.filter(e=>!e.dead).sort((a,b)=>dist(hero,a)-dist(hero,b))[0];
  if(!target)return;
  const distance=dist(hero,target);
- if(distance>105){floating(hero.x,hero.y-38,'사거리 밖 · 마법 사용','#e1d2b8',.8);return;}
+ if(distance>95){floating(hero.x,hero.y-38,'가까이 이동해 공격','#e1d2b8',.8);return;}
  hero.face=target.x>=hero.x?1:-1;
- const finish=hero.atkCombo===2;const damage=Math.round(hero.damage*(finish?1.75:hero.atkCombo===1?1.22:1));
+ const finish=hero.atkCombo===2;const consumed=finish&&resonance===3;const damage=Math.round(hero.damage*(finish?(consumed?2.95:1.75):hero.atkCombo===1?1.22:1));if(consumed){resonance=0;hero.mp=clamp(hero.mp+16,0,hero.maxMp);toast('✦ 월광 반격','완벽한 달걸음이 세 번째 검격을 강화합니다',2.5);}
  for(const e of entities){
   if(!e.dead&&dist(hero,e)<(finish?93:78)){
    hitEnemy(e,e===target?damage:Math.round(damage*.5));
   }
  }
- if(finish){pulse(hero.x,hero.y-14,85,'#ead8a5');floating(hero.x,hero.y-44,'✧ 공명 3연격','#ffebbf',1.1);}
+ if(finish){pulse(hero.x,hero.y-14,consumed?118:85,consumed?'#b7e9ff':'#ead8a5');floating(hero.x,hero.y-44,'✧ 공명 3연격','#ffebbf',1.1);}
  sfx('slash');
 }
 function useSkill(){
  if(scene!=='play'||railPhase!=='battle'||hero.skillT>0)return;
  const sk=currentSpell();
  if(hero.mp<sk.mp){toast('마력이 부족합니다',`${sk.name}에 마력 ${sk.mp} 필요`,1.8);return;}
- hero.mp-=sk.mp;hero.skillT=Math.max(2.4,sk.cd-(hero.blessings.moon||0)*.22);hero.inv=Math.max(hero.inv,.30);
+ const reducedMp=resonance>0?Math.min(6*resonance,sk.mp-5):0;hero.mp-=sk.mp-reducedMp;resonance=0;hero.skillT=Math.max(2.4,sk.cd-(hero.blessings.moon||0)*.22);hero.inv=Math.max(hero.inv,.30);
  const lv=hero.level;
  if(sk.level===1){
   pulse(hero.x,hero.y,112,'#9fd8f8');makeParticles(hero.x,hero.y-8,45,['#c9e7fd','#b4c9f5','#f0e1b6','#709eca'],2.1);
@@ -357,7 +377,7 @@ function useSkill(){
  chime(750);sfx('spell');updateUI();
 }
 function checkInteractions(){if(scene!=='play'||railPhase!=='free')return;for(const chest of chests)if(!fragmentFlags[chest.id]&&dist(hero,chest)<32){pickChest(chest);return}if(followTarget){const targ=followTarget,near=dist(hero,targ);if(targ.id&&npcPositions.includes(targ)&&near<43){followTarget=null;waypointPath=[];autoGoal=null;talkNpc(targ)}else if(targ.id==='bellknight'&&near<45){followTarget=null;waypointPath=[];autoGoal=null;}else if(targ.type&&near<43){followTarget=null;waypointPath=[];autoGoal=null}}}
-function update(dt){if(paused)return;gameTime+=dt;openingUpdate(dt);timeToSave+=dt;hero.atkT=Math.max(0,hero.atkT-dt);hero.atkSwing=Math.max(0,hero.atkSwing-dt);hero.skillT=Math.max(0,hero.skillT-dt);hero.inv=Math.max(0,hero.inv-dt);hero.mp=clamp(hero.mp+dt*3.2,0,hero.maxMp);if(gameTime-hero.lastHurt>6)hero.hp=clamp(hero.hp+dt*2.1,0,hero.maxHp);
+function update(dt){if(paused)return;gameTime+=dt;openingUpdate(dt);timeToSave+=dt;hero.atkT=Math.max(0,hero.atkT-dt);hero.atkSwing=Math.max(0,hero.atkSwing-dt);hero.skillT=Math.max(0,hero.skillT-dt);hero.inv=Math.max(0,hero.inv-dt);dodgeCooldown=Math.max(0,dodgeCooldown-dt);dodgeTime=Math.max(0,dodgeTime-dt);hero.mp=clamp(hero.mp+dt*3.2,0,hero.maxMp);if(gameTime-hero.lastHurt>6)hero.hp=clamp(hero.hp+dt*2.1,0,hero.maxHp);
  if(railPhase==='free'&&pointerDown&&pointer.x>0){const dest={x:cam.x+pointer.x,y:cam.y+pointer.y};if(!autoGoal||Math.hypot(dest.x-autoGoal.x,dest.y-autoGoal.y)>24){setGoal(dest.x,dest.y)}}
  // Blended velocity locomotion. The route is automatic, but footsteps, direction and camera are eased.
  let aimX=0,aimY=0,goalDistance=Infinity;
@@ -371,20 +391,28 @@ function update(dt){if(paused)return;gameTime+=dt;openingUpdate(dt);timeToSave+=
    if(goalDistance>1){aimX=vx/goalDistance;aimY=vy/goalDistance;}
   }
  }else if(autoGoal){autoGoal=null;}
- if(railPhase==='free'&&(keys.up||keys.down||keys.left||keys.right)){
+ if((railPhase==='free'||railPhase==='battle')&&(keys.up||keys.down||keys.left||keys.right)){
   aimX=(keys.right?1:0)-(keys.left?1:0);aimY=(keys.down?1:0)-(keys.up?1:0);
   const len=Math.hypot(aimX,aimY)||1;aimX/=len;aimY/=len;
   autoGoal=null;followTarget=null;waypointPath=[];
  }
+ if(railPhase==='battle'){
+   autoGoal=null;waypointPath=[];const joystick=getMoveVector();
+   if(Math.hypot(joystick.x,joystick.y)>.08){aimX=joystick.x;aimY=joystick.y;}
+   if(dodgeTime>0){aimX=dodgeDirection.x;aimY=dodgeDirection.y;}
+ }
  const wantsMove=aimX!==0||aimY!==0;
- let pace=hero.speed;
+ let pace=hero.speed*(railPhase==='battle'?1.1:1);if(railPhase==='battle'&&dodgeTime>0)pace*=2.85;
  if(autoGoal&&waypointPath.length===1&&goalDistance<68)pace*=Math.max(.20,Math.min(1,goalDistance/68));
- const influence=1-Math.exp(-dt*(wantsMove?8.5:12));
+ const influence=1-Math.exp(-dt*(dodgeTime>0?32:wantsMove?13:16));
  hero.vx+=(aimX*pace-hero.vx)*influence;hero.vy+=(aimY*pace-hero.vy)*influence;
  const speedNow=Math.hypot(hero.vx,hero.vy);
  const wasX=hero.x,wasY=hero.y;
  if(speedNow>.16){
-  if(!moveTry(hero.vx*dt,hero.vy*dt)){hero.vx*=.22;hero.vy*=.22;}
+  if(railPhase==='battle'){
+   const nx=clamp(hero.x+hero.vx*dt,combatCenter.x-169,combatCenter.x+169),ny=clamp(hero.y+hero.vy*dt,combatCenter.y-115,combatCenter.y+115);
+   if(!isBlocked(nx,ny)){hero.x=nx;hero.y=ny;}else if(!moveTry(hero.vx*dt,hero.vy*dt)){hero.vx*=.2;hero.vy*=.2;}
+  }else if(!moveTry(hero.vx*dt,hero.vy*dt)){hero.vx*=.22;hero.vy*=.22;}
  }
  const moved=Math.hypot(hero.x-wasX,hero.y-wasY);
  const movement=moved/Math.max(.003,dt);
@@ -394,7 +422,7 @@ function update(dt){if(paused)return;gameTime+=dt;openingUpdate(dt);timeToSave+=
  // Combat: 1-tap sword, 1-tap spell; no automatic attacking.
  // Monster AI: tells (glow) before hits; simple movement can avoid the attack.
  for(const e of entities){if(e.dead){e.deadT-=dt;continue}e.hitT=Math.max(0,e.hitT-dt);e.stun=Math.max(0,e.stun-dt);e.attack=Math.max(0,e.attack-dt);const d=dist(e,hero),activeNear=d<(e.type==='boss'?230:168);if(activeNear)e.aggro=6;else e.aggro=Math.max(0,e.aggro-dt);
- if(railPhase==='battle'&&e.aggro>0&&e.stun<=0){if(e.windup>0){e.windup-=dt;if(e.windup<=0){if(e.type==='wraith'&&e.rangedWindup){const a=Math.atan2(hero.y-e.y,hero.x-e.x);shots.push({x:e.x,y:e.y-12,vx:Math.cos(a)*83,vy:Math.sin(a)*83,life:3.5,damage:e.damage});e.rangedWindup=false;makeParticles(e.x,e.y-12,7,['#8baecd','#a2d3e9'])}else{if(e.type==='wolf'&&dist(e,hero)<60){const a=Math.atan2(hero.y-e.y,hero.x-e.x);e.x+=Math.cos(a)*15;e.y+=Math.sin(a)*15}if(dist(e,hero)<e.range+18)hurt(e.damage+(e.type==='boss'&&e.hp<e.maxHp*.5?5:0),e)}e.attack=e.type==='boss'?1.38:e.type==='guardian'?1.9:1.45;e.windup=0}}else if(e.type==='wraith'&&d>50&&d<130&&e.attack<=0){e.windup=.9;e.rangedWindup=true;}else if(d<e.range+9&&e.attack<=0){e.windup=e.type==='boss'?.85:e.type==='guardian'?.8:.63;e.rangedWindup=false;}else if(d>e.range+6&&d<255){const a=Math.atan2(hero.y-e.y,hero.x-e.x);const speed=e.speed*(e.type==='boss'&&e.hp<e.maxHp*.5?1.3:1);let nx=e.x+Math.cos(a)*speed*dt,ny=e.y+Math.sin(a)*speed*dt;if(!isBlocked(nx,ny)){e.x=nx;e.y=ny}else if(!isBlocked(nx,e.y))e.x=nx;else if(!isBlocked(e.x,ny))e.y=ny}}
+ if(railPhase==='battle'&&e.aggro>0&&e.stun<=0){if(e.windup>0){e.windup-=dt;if(e.windup<=0){if(e.type==='wraith'&&e.rangedWindup){const a=Math.atan2((e.windupY??hero.y)-e.y,(e.windupX??hero.x)-e.x);shots.push({x:e.x,y:e.y-12,vx:Math.cos(a)*83,vy:Math.sin(a)*83,life:3.5,damage:e.damage});e.rangedWindup=false;makeParticles(e.x,e.y-12,7,['#8baecd','#a2d3e9'])}else{if(e.type==='wolf'&&dist(e,hero)<60){const a=Math.atan2(hero.y-e.y,hero.x-e.x);e.x+=Math.cos(a)*15;e.y+=Math.sin(a)*15}if(dist(e,hero)<e.range+18&&Math.hypot(hero.x-(e.windupX??hero.x),hero.y-(e.windupY??hero.y))<e.range+20)hurt(e.damage+(e.type==='boss'&&e.hp<e.maxHp*.5?5:0),e)}e.attack=e.type==='boss'?1.38:e.type==='guardian'?1.9:1.45;e.windup=0}}else if(e.type==='wraith'&&d>50&&d<130&&e.attack<=0){e.windup=.9;e.windupMax=.9;e.windupX=hero.x;e.windupY=hero.y;e.rangedWindup=true;}else if(d<e.range+9&&e.attack<=0){e.windup=e.type==='boss'?1.02:e.type==='guardian'?.94:.78;e.windupMax=e.windup;e.windupX=hero.x;e.windupY=hero.y;e.rangedWindup=false;}else if(d>e.range+6&&d<255){const a=Math.atan2(hero.y-e.y,hero.x-e.x);const speed=e.speed*(e.type==='boss'&&e.hp<e.maxHp*.5?1.3:1);let nx=e.x+Math.cos(a)*speed*dt,ny=e.y+Math.sin(a)*speed*dt;if(!isBlocked(nx,ny)){e.x=nx;e.y=ny}else if(!isBlocked(nx,e.y))e.x=nx;else if(!isBlocked(e.x,ny))e.y=ny}}
  else if(e.windup>0)e.windup=Math.max(0,e.windup-dt);
  if(e.type==='boss'&&e.hp<e.maxHp*.5&&!e.summoned){e.summoned=true;spawnMonster('wraith',e.x-82,e.y-76,'called1');spawnMonster('wraith',e.x+82,e.y+76,'called2');toast('THE OATH REMAINS','달의 기사가 그림자를 불렀습니다',4)}
  }
@@ -405,7 +433,7 @@ function update(dt){if(paused)return;gameTime+=dt;openingUpdate(dt);timeToSave+=
  for(const f of flecks){f.x+=f.vx*dt;f.y+=f.vy*dt;if(f.y>WH+15){f.y=-5;f.x=rand(0,WW)}if(f.x>WW)f.x=0}
  if(toastT>0){toastT-=dt;if(toastT<=0)$('screenToast').style.opacity='0'}
  if(timeToSave>12){timeToSave=0;save()}checkInteractions();railTick(dt);updateUI();
- const zone=regionName(hero.x);if(UI.place.textContent!==zone){UI.place.textContent=zone;toast('NOW ENTERING',zone,3.5);if(zone==='달이 잠든 성당'&&!bossGone)UI.tip.textContent='✦ 잊힌 기사가 마지막 맹세를 지키고 있습니다.';else UI.tip.textContent='✦ 달빛이 길을 기억하고 있습니다.'}
+ const zone=regionName(hero.x);if(UI.place.textContent!==zone){UI.place.textContent=zone;if(railPhase==='travel')toast('NOW ENTERING',zone,2.5);if(zone==='달이 잠든 성당'&&!bossGone)UI.tip.textContent='✦ 잊힌 기사가 마지막 맹세를 지키고 있습니다.';else UI.tip.textContent='✦ 달빛이 길을 기억하고 있습니다.'}
 }
 function drawCharacter(c,x,y,kind,dir=1,t=0,flash=false){
  const activeWalk=kind==='hero'?Math.min(1,hero.moving||0):.12;const bounce=kind==='hero'?Math.abs(Math.sin(t))*.7*activeWalk+Math.sin(gameTime*1.9)*.24:Math.sin(t)*.45;
@@ -444,7 +472,7 @@ function drawMonster(c,e){const x=Math.floor(e.x),y=Math.floor(e.y+Math.sin(game
  else if(e.type==='wraith'){polygon(c,[[x-13,y-4],[x-7,y-27],[x+8,y-30],[x+14,y-3],[x+5,y+2],[x-4,y-3]],flash||'#7c91ac');polygon(c,[[x-8,y-8],[x-6,y-26],[x+6,y-27],[x+9,y-8]],'#394e67');rect(c,x-5,y-18,4,2,'#b0dce8');rect(c,x+3,y-18,4,2,'#b0dce8');rect(c,x-9,y-4,3,10,'#677895');rect(c,x+7,y-3,3,10,'#677895')}
  else if(e.type==='guardian'){rect(c,x-15,y-20,30,23,flash||'#60646d');rect(c,x-13,y-22,26,9,'#92939b');rect(c,x-10,y-32,20,15,'#707781');rect(c,x-8,y-34,17,5,'#b6b4ac');rect(c,x-5,y-24,3,2,'#d7aaa4');rect(c,x+4,y-24,3,2,'#d7aaa4');rect(c,x-18,y-13,7,10,'#6c6b72');rect(c,x+12,y-13,7,10,'#6c6b72')}
  else if(e.type==='boss'){disk(c,x,y-15,26,'#6986b022');rect(c,x-18,y-26,36,30,flash||'#64758a');rect(c,x-15,y-28,30,20,'#7c8ca1');rect(c,x-12,y-37,24,16,'#687f94');polygon(c,[[x-14,y-33],[x-7,y-50],[x,y-39],[x+9,y-52],[x+15,y-34]],'#a2a9b0');rect(c,x-8,y-26,6,3,'#b9e6f3');rect(c,x+3,y-26,6,3,'#b9e6f3');rect(c,x-19,y-13,7,13,'#536477');rect(c,x+12,y-13,8,13,'#526073');rect(c,x+19,y-36,4,37,'#c2d4e4');rect(c,x+18,y-40,6,8,'#e6e8eb');rect(c,x+13,y-12,15,4,'#b0a484');rect(c,x-10,y-4,8,11,'#313e4f');rect(c,x+4,y-4,8,11,'#313e4f');}
- if(e.windup>0){const amt=e.windup/(e.type==='wraith'&&e.rangedWindup?.9:e.type==='boss'?.85:e.type==='guardian'?.8:.63);ctx.strokeStyle=amt<.35?'#f8b9a7':'#d16d82';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y-5,e.range+12,-Math.PI/2,-Math.PI/2+TWO*(1-amt));ctx.stroke()}
+ if(e.windup>0){const amt=e.windup/(e.windupMax||.8);ctx.strokeStyle=amt<.35?'#f8b9a7':'#d16d82';ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y-5,e.range+12,-Math.PI/2,-Math.PI/2+TWO*(1-amt));ctx.stroke()}
  if(e.hp<e.maxHp){rect(c,x-17,y-(e.type==='boss'?59:43),34,4,'#2a2c31');rect(c,x-16,y-(e.type==='boss'?58:42),32*e.hp/e.maxHp,2,e.type==='boss'?'#d49f9a':'#afc6b6')}
 }
 function drawChest(c,p){const opened=fragmentFlags[p.id],t=gameTime;const x=p.x,y=p.y;if(!opened){const shimmer=.6+.4*Math.sin(t*2+p.id);disk(c,x,y-27,12+2*shimmer,'#a4d6e02b');rect(c,x-9,y-37,18,11,'#a7cad4');rect(c,x-6,y-42,12,5,'#d3edf1');rect(c,x-3,y-49,6,8,'#f4e5c1');rect(c,x-2,y-51,4,4,'#ffffff');if(t%2.7<.8){rect(c,x-21,y-28,3,3,'#d4e7fa');rect(c,x+18,y-36,2,3,'#d4e7fa')}}else {rect(c,x-4,y-33,8,8,'#b6b1a2');rect(c,x-2,y-36,4,4,'#a1c2c8')}}
@@ -467,12 +495,18 @@ function drawGame(){ctx.clearRect(0,0,W,H);const tx=clamp(hero.x-W*.5,0,WW-W),ty
  ctx.drawImage(terrain,X,Y,W,H,0,0,W,H);
  drawAmbient(ctx);
  ctx.save();ctx.translate(-X,-Y);
+ if(window.LB_VISUALS)window.LB_VISUALS.drawLivingWorld(ctx,cam,hero,gameTime,railPhase);
  for(const [x,y] of [[78,500],[637,528],[875,475],[1456,490],[2070,469]])drawLantern(ctx,x,y);
  for(const p of chests)if(Math.abs(p.x-hero.x)<450)drawChest(ctx,p);
  for(const npc of npcPositions){if(Math.abs(npc.x-hero.x)>460)continue;drawCharacter(ctx,npc.x,npc.y,npc.id,1,Math.sin(gameTime*2+npc.x)*.9);if(dist(npc,hero)<116){disk(ctx,npc.x,npc.y-40,8,'#142634');ctx.font='bold 12px Georgia';ctx.textAlign='center';ctx.fillStyle='#ebd2a0';ctx.fillText('!',npc.x,npc.y-36)}}
  for(const e of entities)if(!e.dead||e.deadT>0)if(Math.abs(e.x-hero.x)<540)drawMonster(ctx,e);
- if(hero.inv<=0||Math.floor(gameTime*15)%2===0)drawCharacter(ctx,hero.x,hero.y,'hero',hero.face,hero.walk,hero.atkSwing>.09);
+ if(hero.inv<=0||Math.floor(gameTime*15)%2===0){drawCharacter(ctx,hero.x,hero.y,'hero',hero.face,hero.walk,hero.atkSwing>.09);if(window.LB_VISUALS)window.LB_VISUALS.drawHeroDetails(ctx,hero,gameTime);}
  if(hero.atkSwing>0){ctx.globalAlpha=hero.atkSwing/.21;ctx.save();ctx.translate(hero.x,hero.y-13);ctx.scale(hero.face,1);ctx.strokeStyle='#ebead1';ctx.lineWidth=3;ctx.beginPath();ctx.arc(1,0,30,-1.2,.75);ctx.stroke();ctx.strokeStyle='#98cce4';ctx.lineWidth=2;ctx.beginPath();ctx.arc(1,0,36,-1.25,.4);ctx.stroke();ctx.restore();ctx.globalAlpha=1}
+ if(railPhase==='battle'){
+   ctx.save();ctx.strokeStyle='#a7d7e877';ctx.lineWidth=1.2;ctx.setLineDash([5,8]);ctx.beginPath();ctx.ellipse(combatCenter.x,combatCenter.y-3,177,124,0,0,TWO);ctx.stroke();ctx.setLineDash([]);
+   entities.filter(e=>!e.dead&&e.windup>0).forEach(e=>{const r=e.rangedWindup?20:e.range+17;const gx=e.windupX??e.x,gy=e.windupY??e.y,part=clamp(1-e.windup/(e.windupMax||.8),0,1);ctx.fillStyle='#d46f6350';ctx.beginPath();ctx.ellipse(gx,gy-2,r,r*.66,0,0,TWO);ctx.fill();ctx.strokeStyle=part>.7?'#ffdd9a':'#de998d';ctx.lineWidth=2;ctx.beginPath();ctx.ellipse(gx,gy-2,r,r*.66,0,0,TWO);ctx.stroke();ctx.fillStyle='#f0c5a7';ctx.fillRect(gx-2,gy-2,4,4);});
+   ctx.restore();
+ }
  for(const s of shines){const prog=1-s.life/s.max;ctx.globalAlpha=1-prog;ctx.lineWidth=2.2;ctx.strokeStyle=s.color;ctx.beginPath();ctx.ellipse(s.x,s.y-4,Math.max(6,s.r*prog),Math.max(3,s.r*prog*.55),0,0,TWO);ctx.stroke();ctx.globalAlpha=1}
  for(const b of shots){disk(ctx,b.x,b.y-10,7,'#9dc8e666');disk(ctx,b.x,b.y-10,3,'#d4f0fc')}
  for(const p of particles){ctx.globalAlpha=clamp(p.life/p.max,0,1);rect(ctx,p.x,p.y,p.size,p.size,p.color)}ctx.globalAlpha=1;
@@ -499,29 +533,35 @@ function drawGame(){ctx.clearRect(0,0,W,H);const tx=clamp(hero.x-W*.5,0,WW-W),ty
 let ac=null,master=null,musicTick=0,nextMusic=0;const fantasyBgm=new Audio('audio/the-bells-beyond-the-vale.ogg');fantasyBgm.loop=true;fantasyBgm.volume=.37;fantasyBgm.preload='none';
 function audioInit(){if(!audioOn)return;if(fantasyBgm.paused)fantasyBgm.play().catch(()=>{});try{ac=ac||new(window.AudioContext||window.webkitAudioContext)();if(ac.state==='suspended')ac.resume();if(!master){master=ac.createGain();master.gain.value=.16;master.connect(ac.destination)}}catch(err){ac=null}}
 function tone(freq,dur=.32,vol=.2,type='sine',delay=0){if(!ac||!audioOn)return;try{const o=ac.createOscillator(),v=ac.createGain();o.type=type;o.frequency.setValueAtTime(freq,ac.currentTime+delay);v.gain.setValueAtTime(0,ac.currentTime+delay);v.gain.linearRampToValueAtTime(vol,ac.currentTime+delay+.025);v.gain.exponentialRampToValueAtTime(.001,ac.currentTime+delay+dur);o.connect(v);v.connect(master);o.start(ac.currentTime+delay);o.stop(ac.currentTime+delay+dur+.04)}catch(err){}}
-function chime(freq=670){audioInit();tone(freq,.45,.32);tone(freq*1.5,.65,.12,'sine',.11)}
-function sfx(type){if(!ac)return; if(type==='slash'){tone(190,.075,.13,'triangle');tone(340,.09,.12,'sawtooth',.02)}else if(type==='hurt')tone(94,.28,.28,'triangle');else if(type==='spell'){tone(440,.65,.25);tone(660,.85,.12,'sine',.18)}else if(type==='death')tone(270,.23,.1,'triangle')}
+function chime(freq=670){audioInit();tone(freq,.33,.10);tone(freq*1.5,.38,.038,'sine',.09)}
+function pageTurnSfx(){if(!ac||!audioOn)return;tone(310,.085,.028,'triangle');tone(420,.115,.015,'sine',.045)}
+function sfx(type){if(!ac)return; if(type==='slash'){tone(190,.075,.13,'triangle');tone(340,.09,.12,'sawtooth',.02)}else if(type==='hurt')tone(94,.28,.28,'triangle');else if(type==='spell'){tone(440,.65,.25);tone(660,.85,.12,'sine',.18)}else if(type==='dodge'){tone(220,.09,.075,'sine');tone(440,.13,.038,'triangle',.025)}else if(type==='death')tone(270,.23,.1,'triangle')}
 function playBell(){audioInit();for(let i=0;i<4;i++){tone(185*(i===3?2:1),3,.3,'sine',i*1.2);tone(370*(i===3?2:1),2.6,.11,'sine',i*1.2+.04)}}
 function music(dt){if(!audioOn&&!fantasyBgm.paused)fantasyBgm.pause();}
 // Input / HUD
 const keys={up:false,down:false,left:false,right:false};
 function gameCoords(e){const b=canvas.getBoundingClientRect();return {x:(e.clientX-b.left)/b.width*W,y:(e.clientY-b.top)/b.height*H}}
 function handleTap(e){if(scene!=='play'||railPhase!=='free')return;const pt=gameCoords(e),world={x:clamp(cam.x+pt.x,0,WW),y:clamp(cam.y+pt.y,0,WH)};const npc=npcPositions.find(n=>dist(n,world)<32);if(npc){setGoal(npc.x,npc.y,npc);if(dist(hero,npc)<45)checkInteractions();return}const enemy=entities.find(n=>!n.dead&&dist(n,world)<38);if(enemy){setGoal(enemy.x,enemy.y,enemy);return}const chest=chests.find(c=>!fragmentFlags[c.id]&&dist(c,world)<40);if(chest){setGoal(chest.x,chest.y,chest);return}setGoal(world.x,world.y)}
-canvas.addEventListener('pointerdown',e=>{if(scene!=='play'||railPhase!=='free')return;canvas.setPointerCapture(e.pointerId);const p=gameCoords(e);pointer=p;pointerDown=true;handleTap(e)});
-canvas.addEventListener('pointermove',e=>{if(!pointerDown||scene!=='play')return;pointer=gameCoords(e)});
-const pointerRelease=()=>{pointerDown=false};canvas.addEventListener('pointerup',pointerRelease);canvas.addEventListener('pointercancel',pointerRelease);window.addEventListener('blur',pointerRelease);
-window.addEventListener('keydown',e=>{const key=e.key.toLowerCase();if(['arrowup','w'].includes(key))keys.up=true;if(['arrowdown','s'].includes(key))keys.down=true;if(['arrowleft','a'].includes(key))keys.left=true;if(['arrowright','d'].includes(key))keys.right=true;if([' ','enter','escape','arrowup','arrowdown','arrowleft','arrowright'].includes(key))e.preventDefault();if(e.repeat)return;if(key===' '&&scene==='play')attackSword();if(key==='q'&&scene==='play')useSkill();if(key==='tab'&&scene==='play'){e.preventDefault();cycleSpell();}if(key==='e'&&scene==='play'){let near=npcPositions.filter(n=>dist(n,hero)<58).sort((a,b)=>dist(a,hero)-dist(b,hero))[0];if(near)talkNpc(near)}if(key==='escape'){if(scene==='panel')closePanel();else if(scene==='play')showPause();else if(scene==='dialog')$('dialogNext').click()}if(key==='m'&&scene==='play')showMap();if(key==='i'&&scene==='play')showJournal()});
+canvas.addEventListener('pointerdown',e=>{if(scene==='play'&&railPhase==='battle'){if(gameCoords(e).x<W*.6){thumb.active=true;thumb.pointer=e.pointerId;thumb.originX=e.clientX;thumb.originY=e.clientY;thumb.x=thumb.y=0;canvas.setPointerCapture(e.pointerId);}return;}if(scene!=='play'||railPhase!=='free')return;canvas.setPointerCapture(e.pointerId);const p=gameCoords(e);pointer=p;pointerDown=true;handleTap(e)});
+canvas.addEventListener('pointermove',e=>{if(scene==='play'&&railPhase==='battle'&&thumb.active&&thumb.pointer===e.pointerId){const dx=e.clientX-thumb.originX,dy=e.clientY-thumb.originY,len=Math.max(1,Math.hypot(dx,dy)),scale=Math.min(1,len/46);thumb.x=dx/len*scale;thumb.y=dy/len*scale;return;}if(!pointerDown||scene!=='play')return;pointer=gameCoords(e)});
+const pointerRelease=()=>{pointerDown=false;if(thumb.active)clearThumb()};canvas.addEventListener('pointerup',pointerRelease);canvas.addEventListener('pointercancel',pointerRelease);window.addEventListener('blur',pointerRelease);
+window.addEventListener('keydown',e=>{const key=e.key.toLowerCase();if(['arrowup','w'].includes(key))keys.up=true;if(['arrowdown','s'].includes(key))keys.down=true;if(['arrowleft','a'].includes(key))keys.left=true;if(['arrowright','d'].includes(key))keys.right=true;if([' ','enter','escape','arrowup','arrowdown','arrowleft','arrowright'].includes(key))e.preventDefault();if(e.repeat)return;if(key===' '&&scene==='play')attackSword();if(key==='q'&&scene==='play')useSkill();if((key==='shift'||key==='f')&&scene==='play')dodge();if(key==='tab'&&scene==='play'){e.preventDefault();cycleSpell();}if(key==='e'&&scene==='play'){let near=npcPositions.filter(n=>dist(n,hero)<58).sort((a,b)=>dist(a,hero)-dist(b,hero))[0];if(near)talkNpc(near)}if(key==='escape'){if(scene==='panel')closePanel();else if(scene==='play')showPause();else if(scene==='dialog')$('dialogNext').click()}if(key==='m'&&scene==='play')showMap();if(key==='i'&&scene==='play')showJournal()});
 window.addEventListener('keyup',e=>{const key=e.key.toLowerCase();if(['arrowup','w'].includes(key))keys.up=false;if(['arrowdown','s'].includes(key))keys.down=false;if(['arrowleft','a'].includes(key))keys.left=false;if(['arrowright','d'].includes(key))keys.right=false});
-UI.skill.onclick=()=>{audioInit();useSkill()};$('spellSwitch').onclick=()=>{audioInit();cycleSpell()};$('attackButton').onclick=()=>{audioInit();attackSword()};$('mapBtn').onclick=()=>{if(scene==='play')showMap()};$('bagBtn').onclick=()=>{if(scene==='play')showJournal()};$('pauseBtn').onclick=()=>{if(scene==='play')showPause()};$('panelClose').onclick=closePanel;
+UI.skill.onclick=()=>{audioInit();useSkill()};$('spellSwitch').onclick=()=>{audioInit();cycleSpell()};$('attackButton').onclick=()=>{audioInit();attackSword()};$('dodgeButton').onclick=()=>{audioInit();dodge()};
+const stick=$('movePad'),stickNub=$('stickNub');
+function stickUpdate(e){const r=stick.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;const dx=e.clientX-cx,dy=e.clientY-cy,l=Math.max(1,Math.hypot(dx,dy)),scale=Math.min(1,l/(r.width*.34));thumb.x=dx/l*scale;thumb.y=dy/l*scale;stickNub.style.transform=`translate(calc(-50% + ${thumb.x*31}px),calc(-50% + ${thumb.y*31}px))`;}
+stick.addEventListener('pointerdown',e=>{if(scene!=='play'||railPhase!=='battle')return;e.preventDefault();stick.setPointerCapture(e.pointerId);thumb.active=true;thumb.pointer=e.pointerId;stickUpdate(e)});
+stick.addEventListener('pointermove',e=>{if(thumb.active&&thumb.pointer===e.pointerId)stickUpdate(e)});
+for(const ev of ['pointerup','pointercancel','lostpointercapture'])stick.addEventListener(ev,clearThumb);$('mapBtn').onclick=()=>{if(scene==='play')showMap()};$('bagBtn').onclick=()=>{if(scene==='play')showJournal()};$('pauseBtn').onclick=()=>{if(scene==='play')showPause()};$('panelClose').onclick=closePanel;
 function showJournal(){const fragments=fragmentFlags.filter(Boolean).length;const note=questStage<2?'달의 조각이 흩어져 있습니다.':questStage<4?'종의 울림이 성당에서 기다리고 있습니다.':'종의 울림이 다시 돌아왔습니다.';const html=`<div class="panelRow"><span>여행자</span><strong>Lv. ${hero.level}</strong></div><div class="panelRow"><span>검의 위력</span><strong>${hero.damage}</strong></div><div class="panelRow"><span>장비 외형</span><strong>검 +${hero.swordLevel} · 갑옷 +${hero.armorLevel}</strong></div><div class="panelRow"><span>배운 마법</span><strong>${unlockedSpells().map(sk=>sk.name).join(' · ')}</strong></div><div class="panelRow"><span>월광의 조각</span><strong>${fragments} / 3</strong></div><div class="panelRow"><span>현재 은화</span><strong>✦ ${hero.gold}</strong></div><p>“${note}”</p><p class="tiny">서약의 기록: ${(hero.oaths||[]).length}개 · 여정의 장면: ${railIndex+1} / ${RAIL_STOPS.length}</p><p><strong>${questData[questStage][0]}</strong><br>${questData[questStage][1]}</p><p class="tiny">기록은 12초마다 자동 저장됩니다. 전투는 직접 검격 버튼을 누르고 마법을 선택해 진행합니다. 성장에 따라 마법이 해금됩니다.</p>`;openPanel('여정 일지',html,'A TALE IN SILVER AND ASH')}
 function showMap(){const html=`<p>달빛이 정해진 길로 이끕니다. 지도는 현재 위치와 여정의 주요 장면을 보여줍니다.</p><canvas id="mapView" width="530" height="185"></canvas><div class="panelRow"><span>◇ 미회수 달의 조각</span><strong>${fragmentFlags.filter(Boolean).length} / 3</strong></div><p class="tiny">푸른 빛 점이 현재 위치입니다. 다음 장면으로 자동 이동합니다.</p>`;openPanel('찢어진 고지도',html,'THE LANDS OF ELDEN',node=>{const m=node.querySelector('canvas'),c=m.getContext('2d');c.imageSmoothingEnabled=false;c.drawImage(terrain,0,0,WW,WH,0,0,530,185);c.fillStyle='#09152266';c.fillRect(0,0,530,185);for(const p of chests){if(fragmentFlags[p.id])continue;c.fillStyle='#f6dba1';c.font='bold 17px serif';c.fillText('◇',p.x/WW*530,p.y/WH*185)}for(const n of npcPositions){c.fillStyle='#e3c599';c.fillRect(n.x/WW*530-2,n.y/WH*185-2,4,4)}c.fillStyle='#c9ebff';c.beginPath();c.arc(hero.x/WW*530,hero.y/WH*185,4,0,TWO);c.fill();c.strokeStyle='#0c263e';c.lineWidth=1.5;c.stroke();m.addEventListener('click',()=>{closePanel();toast('길잡이의 노래','이동은 이야기 진행에 따라 자동으로 이루어집니다',2.5)})})}
-function showPause(){openPanel('밤의 쉼터',`<p>조용한 밤길에서 잠시 발걸음을 멈췄습니다.</p><div class="panelRow"><span>진행 상황</span><strong>자동 저장 중</strong></div><button id="soundToggle" class="upgrade">♫ 배경 음악: ${audioOn?'켜짐':'꺼짐'}</button><button id="backTitle" class="upgrade">⌂ 시작 화면으로 돌아가기</button><p class="tiny">조작: 이야기 종료 후 자동 이동 / 전투 중 검격 버튼 / 마법 변경 후 사용 / 성장 시 능력 선택</p>`,'PAUSE · THE LAST BELL',node=>{node.querySelector('#soundToggle').onclick=()=>{audioOn=!audioOn;node.querySelector('#soundToggle').textContent='♫ 배경 음악: '+(audioOn?'켜짐':'꺼짐');if(audioOn)audioInit();else fantasyBgm.pause()};node.querySelector('#backTitle').onclick=()=>{save();closePanel();showMenu()}})}
+function showPause(){openPanel('밤의 쉼터',`<p>조용한 밤길에서 잠시 발걸음을 멈췄습니다.</p><div class="panelRow"><span>진행 상황</span><strong>자동 저장 중</strong></div><button id="soundToggle" class="upgrade">♫ 배경 음악: ${audioOn?'켜짐':'꺼짐'}</button><button id="backTitle" class="upgrade">⌂ 시작 화면으로 돌아가기</button><p class="tiny">이야기는 자동 이동 · 전투는 왼쪽 스틱/드래그로 이동, 검격·마법·달걸음. 완벽 회피 후 쌓인 공명은 검격을 강화합니다.</p>`,'PAUSE · THE LAST BELL',node=>{node.querySelector('#soundToggle').onclick=()=>{audioOn=!audioOn;node.querySelector('#soundToggle').textContent='♫ 배경 음악: '+(audioOn?'켜짐':'꺼짐');if(audioOn)audioInit();else fantasyBgm.pause()};node.querySelector('#backTitle').onclick=()=>{save();closePanel();showMenu()}})}
 function startGame(continued){if(continued){if(!load())reset();}else reset();initMonsters();UI.menu.classList.add('hidden');active=true;scene='play';paused=false;audioInit();hero.x=railIndex===0?250:hero.x;hero.y=railIndex===0?460:hero.y;cam.x=clamp(hero.x-W/2,0,WW-W);cam.y=clamp(hero.y-H*.56,0,WH-H);bumpQuest();UI.place.textContent=regionName(hero.x);if(railIndex===10&&questStage===5){setRail(CHRONICLE.length?INTRO_STOPS:10);if(!CHRONICLE.length){railPhase='done';showEnding();}return;}if(!continued){setRail(0);prologueActive=true;prologueTime=0;openingUpdate(.01)}else{setRail(railIndex);if(pendingLevels>0)maybeLevelUp()}}
 function showMenu(){UI.menu.classList.remove('hidden');scene='menu';paused=true;$('continueBtn').classList.toggle('hidden',!hasSave())}
 $('routeAction').onclick=()=>{if(scene!=='play')return;audioInit();if(railPhase==='idle'){setRail(railIndex);return;}if(railPhase==='travel'){setGoal(railGoal.x,railGoal.y);toast('✦ 다음 장면',RAIL_LABELS[railIndex]+'(으)로 자동 이동합니다',2.6)}else if(railPhase==='battle'){attackSword()}else if(railPhase==='done')showEnding();else toast('달빛의 길','대화를 이어가면 다음 장면으로 이동합니다',2.5)};
 $('startBtn').onclick=()=>{try{localStorage.removeItem(SKEY)}catch(e){}startGame(false)};$('continueBtn').onclick=()=>startGame(true);
 // generate a few quietly glowing fireflies, including night fog drifting in shallow swirls
-function boot(){generateTerrain();makeGrid();flecks=Array.from({length:155},(_,i)=>({x:rnd(i,31,21)*WW,y:rnd(i,32,11)*WH,vx:2+rnd(i,35)*9,vy:1+rnd(i,34)*3,tw:.5+rnd(i,8)*1.3,phase:rnd(i,3)*TWO,size:rnd(i,49)>.8?2:1,color:rnd(i,18)>.45?'#d9deb0':'#a4d4d4'}));initMonsters();$('continueBtn').classList.toggle('hidden',!hasSave());UI.place.textContent='잿빛 마을, 엘든';updateUI();drawGame();requestAnimationFrame(frame)}
+function boot(){generateTerrain();if(window.LB_VISUALS)window.LB_VISUALS.decorateTerrain(g,{width:WW,height:WH,rnd,roadY});makeGrid();flecks=Array.from({length:155},(_,i)=>({x:rnd(i,31,21)*WW,y:rnd(i,32,11)*WH,vx:2+rnd(i,35)*9,vy:1+rnd(i,34)*3,tw:.5+rnd(i,8)*1.3,phase:rnd(i,3)*TWO,size:rnd(i,49)>.8?2:1,color:rnd(i,18)>.45?'#d9deb0':'#a4d4d4'}));initMonsters();$('continueBtn').classList.toggle('hidden',!hasSave());UI.place.textContent='잿빛 마을, 엘든';updateUI();drawGame();requestAnimationFrame(frame)}
 if(location.search.includes('lastbell-test'))window.__lastBellTest={tick:dt=>{update(dt);drawGame()},getState:()=>({railIndex,railPhase,questStage,hero:{...hero},entities:entities.filter(e=>!e.dead).length,pendingLevels,scene,selectedSpell:currentSpell().name,spellCount:unlockedSpells().length,moving:hero.moving,velocity:Math.hypot(hero.vx,hero.vy)}),next:()=>{if(railPhase==='travel'){hero.x=railGoal.x;hero.y=railGoal.y;railArrival()}},win:()=>{if(railPhase==='battle'){entities.filter(e=>!e.dead).forEach(e=>hitEnemy(e,9999))}},choice:()=>{const b=document.querySelector('[data-choice]');if(b)b.click()}};
 function frame(t){const dt=clamp((t-last)/1000||.016,0,.042);last=t;frameDelta=dt;update(dt);music(dt);drawGame();requestAnimationFrame(frame)}
 boot();
