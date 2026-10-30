@@ -60,3 +60,28 @@ body:has(.dialogBox:not(.hidden)) #routeAction,body:has(.modal:not(.hidden)) #ro
 /* Cinematic prologue: visible without blocking automatic walking. */
 #openingNarration{position:absolute;left:50%;bottom:27%;transform:translateX(-50%);width:min(82%,560px);padding:12px 20px;text-align:center;line-height:1.6;letter-spacing:.015em;font-family:Georgia,'Noto Serif KR',serif;font-size:clamp(13px,2.2vw,19px);color:#f7e8c5;background:linear-gradient(90deg,rgba(10,19,31,0),rgba(10,19,31,.84) 16%,rgba(10,19,31,.84) 84%,rgba(10,19,31,0));text-shadow:0 1px 6px #02050a;pointer-events:none;z-index:10}
 #openingNarration.hidden{display:none!important}
+
+/* v1.4 The Silver Interval — field combat is manual, travel stays automatic */
+#movePad,#dodgeButton,#resonanceHud{display:none}
+body.combat-active #movePad,body.combat-active #dodgeButton,body.combat-active #resonanceHud{display:flex}
+body.combat-active #routeAction{display:none}
+body.combat-active #questBox{display:none}
+body.combat-active #routeRail{top:158px;max-width:255px;opacity:.83;padding:8px 10px}
+body.combat-active #routeTitle{font-size:14px}
+body.combat-active #routeMode{font-size:10px}
+body.combat-active #bottomLeft{opacity:.2}
+#movePad{position:absolute;z-index:7;left:clamp(20px,7vw,80px);bottom:35px;width:132px;height:132px;border:2px solid #b6d9df8a;border-radius:50%;background:radial-gradient(circle,#9ad7ed16 2%,#192c43a8 55%,#0c172ac9 85%);box-shadow:inset 0 0 26px #8ce2e735,0 0 0 6px #040b1880,0 6px 22px #0007;touch-action:none;align-items:center;justify-content:center;user-select:none}
+#stickTracks{position:absolute;width:74%;height:74%;border:1px dashed #e2dac37c;border-radius:50%;pointer-events:none}
+#stickNub{position:absolute;top:50%;left:50%;width:55px;height:55px;transform:translate(-50%,-50%);border-radius:50%;border:2px solid #efd8a9;background:radial-gradient(circle at 33% 23%,#b2e4f58a,#3e597bbf 70%,#162b48);box-shadow:inset 0 0 15px #c7deec75,0 3px 16px #000a;pointer-events:none;will-change:transform}
+#movePad span{position:absolute;top:-27px;color:#e3d6b9;text-shadow:0 2px 7px #000;font:700 11px system-ui,sans-serif;letter-spacing:3px;pointer-events:none}
+#dodgeButton{position:absolute;right:202px;bottom:36px;z-index:7;width:66px;height:66px;border-radius:50%;border:2px solid #96c5d3;background:radial-gradient(circle at 40% 20%,#668c9d,#18334e 75%);box-shadow:0 0 0 4px #061322ba,0 0 18px #7fcded5c;color:#f6e9c8;flex-direction:column;align-items:center;justify-content:center;font-size:28px;touch-action:manipulation}
+#dodgeButton small{font-size:10px;font-weight:700;letter-spacing:.2px}
+#dodgeButton:active{transform:scale(.94)}
+#resonanceHud{position:absolute;z-index:5;bottom:160px;right:15px;gap:3px;flex-direction:column;align-items:flex-end;background:linear-gradient(110deg,#13273bb8,#162839db);padding:7px 11px;border:1px solid #a7c8d47b;color:#d7e8f9;font:700 11px 'Malgun Gothic',sans-serif;text-shadow:0 1px 3px #0007}
+#resonanceHud b{font:700 15px Georgia,serif;color:#eed7a1}
+body.combat-active #attackButton{right:114px;bottom:34px;width:77px;height:77px}
+body.combat-active #skillButton{bottom:34px;width:77px;height:77px}
+body.combat-active #spellSwitch{bottom:126px}
+@media(max-width:680px){#movePad{left:17px;bottom:28px;width:110px;height:110px}#stickNub{width:49px;height:49px}#dodgeButton{right:178px;bottom:31px;width:55px;height:55px;font-size:23px}#dodgeButton small{font-size:9px}body.combat-active #attackButton{right:100px;bottom:28px;width:65px;height:65px}body.combat-active #skillButton{bottom:28px;width:65px;height:65px}#resonanceHud{bottom:134px;font-size:9px}}
+@media(max-width:390px){#movePad{width:94px;height:94px;bottom:23px;left:8px}#dodgeButton{right:164px;width:50px;height:50px}body.combat-active #attackButton{right:89px}#resonanceHud{bottom:122px}}
+@media(max-height:520px){#movePad{bottom:12px;width:90px;height:90px;left:12px}#dodgeButton{bottom:17px}body.combat-active #attackButton,body.combat-active #skillButton{bottom:16px}#resonanceHud{bottom:103px}}
