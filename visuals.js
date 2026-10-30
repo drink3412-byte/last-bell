@@ -97,6 +97,18 @@ function drawHeroDetails(c,hero,t){
  const x=Math.floor(hero.x),y=Math.floor(hero.y),s=hero.face||1,walk=hero.moving||0;
  c.save();c.translate(x,y);c.scale(s,1);
  const sway=Math.sin(hero.walk||0)*walk;
+ // Acquired fabrics keep the same silhouette and evolve the sprite in small increments.
+ const clothing=hero.cosmetics||{cloak:0,trim:0,aura:0};
+ const cloaks=['#bc696b','#4f9b94','#9982ba','#c2c9dc','#705d69'];
+ const metal=['#c2a77e','#dfbf85','#bcd8e2','#dfd6f8','#f4d8a1'];
+ const cape=cloaks[clothing.cloak||0],finish=metal[clothing.trim||0];
+ fill(c,-12,-16+Math.round(sway),5,17,cape);fill(c,-11,-19,4,5,'#e6d2b8');
+ fill(c,-12,-2+Math.round(sway),6,3,cape);
+ if((clothing.trim||0)>0){fill(c,5,-15,4,2,finish);fill(c,-7,-10,3,2,finish)}
+ if((clothing.trim||0)>1){fill(c,-10,-5,4,2,finish);fill(c,0,-10,3,2,'#eaf4ec')}
+ if((clothing.trim||0)>2){fill(c,10,-17,3,3,finish);fill(c,-8,-15,2,4,finish)}
+ if((clothing.trim||0)>3){fill(c,-5,-11,10,1,finish);fill(c,-1,-27,4,2,finish)}
+ if((clothing.aura||0)>0){const shimmer=.45+.35*Math.sin(t*3);c.globalAlpha=shimmer;circle(c,-15,-20-(t*13%11),1.5,clothing.aura===1?'#b4e2fd':clothing.aura===2?'#fae0aa':'#b5c8ff');circle(c,17,-29-(t*7%16),1.6,clothing.aura===1?'#d8f3ff':clothing.aura===2?'#f7d4a7':'#d3c9ff');c.globalAlpha=1}
  // traveler's bronze cloak trim and hem in richer shades
  fill(c,-11,-12+Math.round(sway),2,10,'#d88e80');fill(c,-10,-3+Math.round(sway),5,3,'#8e5362');fill(c,-8,-18,3,3,'#eec99b');
  // interlocking plate shoulder, breast crest, bright rivets
