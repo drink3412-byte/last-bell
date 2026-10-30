@@ -56,3 +56,7 @@ body:has(.dialogBox:not(.hidden)) #routeAction,body:has(.modal:not(.hidden)) #ro
 #skillButton{bottom:27px}#routeAction{left:45%;bottom:26px}#routeAction:active{transform:translateX(-50%) scale(.97)}
 @media(max-width:680px){#attackButton{right:106px;bottom:23px;width:67px;height:67px;font-size:28px}#attackButton span{font-size:10px}#skillButton{bottom:23px;width:67px;height:67px}#spellSwitch{right:10px;bottom:99px;font-size:10px}#routeAction{bottom:26px;left:39%;min-width:150px;max-width:40vw;font-size:10px;padding:12px 8px}#bottomLeft{bottom:106px}}
 @media(max-height:520px){#attackButton{bottom:12px;width:64px;height:64px;right:104px}#skillButton{bottom:12px;width:64px;height:64px}#spellSwitch{bottom:86px}#routeAction{bottom:11px;left:43%}}
+
+/* Cinematic prologue: visible without blocking automatic walking. */
+#openingNarration{position:absolute;left:50%;bottom:27%;transform:translateX(-50%);width:min(82%,560px);padding:12px 20px;text-align:center;line-height:1.6;letter-spacing:.015em;font-family:Georgia,'Noto Serif KR',serif;font-size:clamp(13px,2.2vw,19px);color:#f7e8c5;background:linear-gradient(90deg,rgba(10,19,31,0),rgba(10,19,31,.84) 16%,rgba(10,19,31,.84) 84%,rgba(10,19,31,0));text-shadow:0 1px 6px #02050a;pointer-events:none;z-index:10}
+#openingNarration.hidden{display:none!important}
